@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="auth">
+  <div class="auth-card">
+    <div class="brand brand-inline">
+      <div class="dot"></div>
+      <div>
+        <div>管理员登录</div>
+        <small class="muted">输入后台账号与密码，继续管理采集任务</small>
+      </div>
+    </div>
+
+    {% if error %}
+    <div class="alert">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/login" class="form">
+      <input type="hidden" name="next" value="{{ next }}">
+      <label>管理员账号
+        <input name="username" placeholder="admin" required autocomplete="username">
+      </label>
+      <label>管理员密码
+        <input name="password" type="password" placeholder="••••••••" required autocomplete="current-password">
+      </label>
+      <button type="submit">进入后台</button>
+    </form>
+
+    <div class="auth-links">
+      <span class="muted">仅限受信任管理员使用</span>
+      <a href="/">返回前台</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

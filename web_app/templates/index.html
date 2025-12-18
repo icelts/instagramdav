@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="header">
+  <div class="brand">
+    <div class="dot"></div>
+    <div>
+      <div>Instagram Clone</div>
+      <small class="muted">快速预览 · 响应式瀑布流</small>
+    </div>
+  </div>
+  <div class="badge">适配移动端 · 随机媒体预览</div>
+</div>
+
+<div class="grid">
+  {% for m in medias %}
+  <div class="card">
+    <div class="media">
+      <img src="{{ m.media_url }}" alt="{{ m.caption }}">
+      <div class="pill">@{{ m.username }}</div>
+    </div>
+    <div class="card-body">
+      <div class="caption">{{ m.caption or ' ' }}</div>
+      <div class="meta">
+        <span>{{ m.full_name or '@' + m.username }}</span>
+        <span>{{ m.taken_at[:10] if m.taken_at else '' }}</span>
+      </div>
+      <div class="stats">
+        <span>❤️ {{ m.likes }}</span>
+        <span>💬 {{ m.comments }}</span>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

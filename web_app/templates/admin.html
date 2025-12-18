@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="toolbar">
+  <div class="brand">
+    <div class="dot"></div>
+    <div>
+      <div>管理面板</div>
+      <small class="muted">采集账号 · 代理 · 目标用户 · 调度间隔</small>
+    </div>
+  </div>
+  <div class="toolbar-actions">
+    <div class="badge">采集间隔：{{ interval }} 分钟</div>
+    <a class="ghost-btn" href="/logout">退出登录</a>
+  </div>
+</div>
+
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="label">采集账号</div>
+    <div class="value">{{ accounts|length }}</div>
+    <span class="stat-hint">登录 Instagram 的机器人账号</span>
+  </div>
+  <div class="stat-card">
+    <div class="label">目标用户</div>
+    <div class="value">{{ users|length }}</div>
+    <span class="stat-hint">当前正在跟踪的用户</span>
+  </div>
+  <div class="stat-card">
+    <div class="label">计划任务</div>
+    <div class="value">{{ jobs|length }}</div>
+    <span class="stat-hint">APScheduler 队列</span>
+  </div>
+  <div class="stat-card">
+    <div class="label">采集频率</div>
+    <div class="value">{{ interval }}m</div>
+    <span class="stat-hint">分钟为单位</span>
+  </div>
+</div>
+
+<div class="panel-grid">
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <p class="panel-title">新增采集账号</p>
+        <p class="panel-sub">配置登录凭据与代理</p>
+      </div>
+    </div>
+    <form method="post" action="/admin/add_account" class="form">
+      <div class="form-inline">
+        <label>用户名
+          <input name="username" required placeholder="请输入 Instagram 账号">
+        </label>
+        <label>密码
+          <input name="password" type="password" required placeholder="账号密码">
+        </label>
+      </div>
+      <label>代理 <span class="muted">(可选)</span>
+        <input name="proxy" placeholder="http://user:pass@host:port">
+      </label>
+      <label>TOTP 密钥 <span class="muted">(可选)</span>
+        <input name="totp_secret" placeholder="绑定双因素验证码时使用">
+      </label>
+      <button type="submit">保存账号</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <p class="panel-title">新增目标用户</p>
+        <p class="panel-sub">可选择立即采集一次</p>
+      </div>
+    </div>
+    <form method="post" action="/admin/add_user" class="form">
+      <label>用户名
+        <input name="username" required placeholder="目标用户名">
+      </label>
+      <label class="inline">
+        <input type="checkbox" name="immediate_collect" value="1"> 立即采集一轮
+      </label>
+      <button type="submit">保存目标</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <p class="panel-title">采集周期</p>
+        <p class="panel-sub">灵活调整任务频率</p>
+      </div>
+    </div>
+    <form method="post" action="/admin/set_interval" class="form">
+      <label>间隔（分钟）
+        <input name="minutes" type="number" min="1" value="{{ interval }}">
+      </label>
+      <button type="submit">更新周期</button>
+    </form>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <div>
+      <p class="panel-title">账号列表</p>
+      <p class="panel-sub">已保存的采集账号与代理</p>
+    </div>
+  </div>
+  <div class="table wide accounts">
+    <div class="thead"><span>账号</span><span>代理</span><span>操作</span></div>
+    {% for a in accounts %}
+    <div class="row">
+      <span>{{ a.username }}</span>
+      <span>{{ a.proxy or '直连' }}</span>
+      <span class="actions">
+        <form method="post" action="/admin/remove_account">
+          <input type="hidden" name="account_id" value="{{ a.id }}">
+          <button type="submit" class="danger">删除</button>
+        </form>
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <div>
+      <p class="panel-title">目标用户</p>
+      <p class="panel-sub">状态与管理</p>
+    </div>
+  </div>
+  <div class="table wide targets">
+    <div class="thead"><span>用户名</span><span>状态</span><span>操作</span></div>
+    {% for u in users %}
+    <div class="row">
+      <span>{{ u.username }}</span>
+      <span>{{ '活跃' if u.is_active else '停用' }}</span>
+      <span class="actions">
+        <form method="post" action="/admin/remove_user">
+          <input type="hidden" name="user_id" value="{{ u.id }}">
+          <button type="submit" class="danger">删除</button>
+        </form>
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <div>
+      <p class="panel-title">计划任务</p>
+      <p class="panel-sub">当前调度队列</p>
+    </div>
+  </div>
+  <div class="table wide jobs">
+    <div class="thead"><span>ID</span><span>下次运行</span><span>触发器</span></div>
+    {% for j in jobs %}
+    <div class="row">
+      <span>{{ j.id }}</span>
+      <span>{{ j.next_run_time }}</span>
+      <span class="muted">{{ j.trigger }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

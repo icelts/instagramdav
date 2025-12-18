@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+
+{% block title %}{{ user.username }} - Instagram Clone{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <!-- 用户信息卡片 -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-2 text-center">
+                        {% if user.profile_pic_url %}
+                            <img src="{{ user.profile_pic_url }}" 
+                                 alt="{{ user.username }}" 
+                                 class="rounded-circle"
+                                 style="width: 120px; height: 120px; object-fit: cover;">
+                        {% else %}
+                            <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center" 
+                                 style="width: 120px; height: 120px;">
+                                <i class="fas fa-user fa-3x text-white"></i>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-10">
+                        <h2 class="mb-1">{{ user.username }}</h2>
+                        {% if user.full_name %}
+                            <p class="text-muted mb-2">{{ user.full_name }}</p>
+                        {% endif %}
+                        {% if user.biography %}
+                            <p class="mb-3">{{ user.biography }}</p>
+                        {% endif %}
+                        
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h4 class="text-primary">{{ "{:,}".format(user.follower_count) if user.follower_count else '-' }}</h4>
+                                    <small class="text-muted">粉丝</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h4 class="text-success">{{ "{:,}".format(user.following_count) if user.following_count else '-' }}</h4>
+                                    <small class="text-muted">关注</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h4 class="text-info">{{ user.posts_count if user.posts_count else '-' }}</h4>
+                                    <small class="text-muted">帖子</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h4 class="text-warning">{{ medias.total if medias.total else '0' }}</h4>
+                                    <small class="text-muted">已采集</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-3">
+                            {% if user.last_collected %}
+                                <span class="badge bg-success">
+                                    <i class="fas fa-check-circle"></i> 最后采集: {{ user.last_collected.strftime('%Y-%m-%d %H:%M') }}
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary">
+                                    <i class="fas fa-clock"></i> 尚未采集
+                                </span>
+                            {% endif %}
+                            
+                            {% if user.is_active %}
+                                <span class="badge bg-primary">
+                                    <i class="fas fa-play"></i> 采集中
+                                </span>
+                            {% else %}
+                                <span class="badge bg-danger">
+                                    <i class="fas fa-pause"></i> 已暂停
+                                </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 操作按钮 -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="btn-group w-100">
+                    <a href="{{ url_for('collect_user', username=user.username) }}" class="btn btn-primary">
+                        <i class="fas fa-download"></i> 立即采集
+                    </a>
+                    <a href="{{ url_for('toggle_user', user_id=user.id) }}" class="btn btn-warning">
+                        <i class="fas fa-toggle-{{ 'on' if user.is_active else 'off' }}"></i> 
+                        {{ '暂停采集' if user.is_active else '开始采集' }}
+                    </a>
+                    <a href="{{ url_for('users') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> 返回用户列表
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 媒体内容 -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-images"></i> 媒体内容</h5>
+                <span class="badge bg-info">{{ medias.total }} 个帖子</span>
+            </div>
+            <div class="card-body">
+                {% if medias.items %}
+                <div class="row">
+                    {% for media in medias.items %}
+                    <div class="col-md-6 col-lg-4 mb-4">
+                        <div class="card media-card h-100">
+                            {% if media.media_type == 'photo' %}
+                                {% if media.media_url %}
+                                    <img src="{{ url_for('serve_media', filename=media.media_url) }}" 
+                                         alt="{{ media.caption or '照片' }}" 
+                                         class="card-img-top"
+                                         style="height: 200px; object-fit: cover;"
+                                         loading="lazy">
+                                {% else %}
+                                    <div class="bg-light d-flex align-items-center justify-content-center card-img-top" 
+                                         style="height: 200px;">
+                                        <i class="fas fa-image fa-3x text-muted"></i>
+                                    </div>
+                                {% endif %}
+                            {% elif media.media_type == 'video' %}
+                                {% if media.thumbnail_url %}
+                                    <img src="{{ url_for('serve_media', filename=media.thumbnail_url) }}" 
+                                         alt="{{ media.caption or '视频' }}" 
+                                         class="card-img-top"
+                                         style="height: 200px; object-fit: cover;"
+                                         loading="lazy">
+                                    <div class="position-absolute top-50 start-50 translate-middle">
+                                        <i class="fas fa-play-circle fa-3x text-white" style="text-shadow: 2px 2px 4px rgba(0,0,0,0.8);"></i>
+                                    </div>
+                                {% else %}
+                                    <div class="bg-light d-flex align-items-center justify-content-center card-img-top" 
+                                         style="height: 200px;">
+                                        <i class="fas fa-video fa-3x text-muted"></i>
+                                    </div>
+                                {% endif %}
+                            {% elif media.media_type == 'album' %}
+                                {% if media.thumbnail_url %}
+                                    <img src="{{ url_for('serve_media', filename=media.thumbnail_url) }}" 
+                                         alt="{{ media.caption or '相册' }}" 
+                                         class="card-img-top"
+                                         style="height: 200px; object-fit: cover;"
+                                         loading="lazy">
+                                    <div class="position-absolute top-0 end-0 p-2">
+                                        <span class="badge bg-info">
+                                            <i class="fas fa-images"></i> 相册
+                                        </span>
+                                    </div>
+                                {% else %}
+                                    <div class="bg-light d-flex align-items-center justify-content-center card-img-top" 
+                                         style="height: 200px;">
+                                        <i class="fas fa-images fa-3x text-muted"></i>
+                                    </div>
+                                {% endif %}
+                            {% endif %}
+                            
+                            <div class="card-body">
+                                {% if media.caption %}
+                                    <p class="card-text">
+                                        {{ media.caption[:100] }}{% if media.caption|length > 100 %}...{% endif %}
+                                    </p>
+                                {% endif %}
+                                
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="btn-group btn-group-sm">
+                                        <span class="btn btn-outline-danger">
+                                            <i class="fas fa-heart"></i> {{ media.like_count }}
+                                        </span>
+                                        <span class="btn btn-outline-primary">
+                                            <i class="fas fa-comment"></i> {{ media.comment_count }}
+                                        </span>
+                                        {% if media.view_count > 0 %}
+                                        <span class="btn btn-outline-success">
+                                            <i class="fas fa-eye"></i> {{ media.view_count }}
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    {% if media.taken_at %}
+                                    <small class="text-muted">
+                                        <i class="fas fa-calendar"></i> {{ media.taken_at.strftime('%Y-%m-%d') }}
+                                    </small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <!-- 分页 -->
+                {% if medias.pages > 1 %}
+                <nav aria-label="媒体分页">
+                    <ul class="pagination justify-content-center">
+                        {% if medias.has_prev %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('user_detail', username=user.username, page=medias.prev_num) }}">
+                                <i class="fas fa-chevron-left"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for page_num in medias.iter_pages() %}
+                            {% if page_num %}
+                                {% if page_num != medias.page %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('user_detail', username=user.username, page=page_num) }}">
+                                        {{ page_num }}
+                                    </a>
+                                </li>
+                                {% else %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ page_num }}</span>
+                                </li>
+                                {% endif %}
+                            {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">…</span>
+                            </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if medias.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('user_detail', username=user.username, page=medias.next_num) }}">
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+                
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-images fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">还没有采集到媒体内容</h5>
+                    <p class="text-muted">点击"立即采集"按钮开始采集这个用户的内容</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.media-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.media-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.position-relative {
+    position: relative;
+}
+
+.position-absolute {
+    position: absolute;
+}
+
+.top-0 {
+    top: 0;
+}
+
+.end-0 {
+    right: 0;
+}
+
+.top-50 {
+    top: 50%;
+}
+
+.start-50 {
+    left: 50%;
+}
+
+.translate-middle {
+    transform: translate(-50%, -50%);
+}
+</style>
+{% endblock %}
