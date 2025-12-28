@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="header">
+  <div class="brand">
+    <div class="dot"></div>
+    <div>
+      <h1 class="page-title"><a href="/{{ user.username }}">@{{ user.username }}</a></h1>
+      <p class="page-subtitle">{{ user.full_name or "Instagram User" }}</p>
+    </div>
+  </div>
+  <div class="detail-actions">
+    <a href="/">返回首页</a>
+    <a href="/admin">管理后台</a>
+  </div>
+</div>
+
+<div class="detail-shell">
+  <div class="detail-media">
+    {% if media.is_album %}
+      <div class="carousel" data-count="{{ media.album_count }}">
+        <button class="carousel-btn prev" type="button">‹</button>
+        <div class="carousel-track">
+          {% for item in media.album_items %}
+          <div class="carousel-item {% if loop.first %}is-active{% endif %}">
+            {% if item.is_video %}
+              <video controls poster="{{ item.thumbnail_url or '' }}">
+                <source src="{{ item.media_url }}" type="video/mp4">
+              </video>
+            {% else %}
+              <img src="{{ item.media_url }}" alt="{{ media.caption }}">
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        <button class="carousel-btn next" type="button">›</button>
+        <div class="carousel-indicator">1 / {{ media.album_count }}</div>
+      </div>
+    {% else %}
+      {% if media.is_video %}
+        <video controls poster="{{ media.thumbnail_url or '' }}">
+          <source src="{{ media.media_url }}" type="video/mp4">
+        </video>
+      {% else %}
+        <img src="{{ media.media_url }}" alt="{{ media.caption }}">
+      {% endif %}
+    {% endif %}
+    <div class="card-body">
+      <div class="caption">{{ media.caption or ' ' }}</div>
+      <div class="stats">
+        <span>❤️ {{ media.like_count }}</span>
+        <span>💬 {{ media.comment_count }}</span>
+        {% if media.view_count %}
+        <span>👀 {{ media.view_count }}</span>
+        {% endif %}
+      </div>
+      <div class="detail-meta">
+        <span>{{ media.media_type }}</span>
+        <span>{{ media.taken_at.strftime('%Y-%m-%d') if media.taken_at else '' }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="detail-panel">
+    <div class="detail-user">
+      {% if user.profile_pic_url %}
+        <img class="avatar" src="{{ user.profile_pic_url }}" alt="{{ user.username }}">
+      {% else %}
+        <div class="avatar"></div>
+      {% endif %}
+      <div>
+        <div><a href="/{{ user.username }}">@{{ user.username }}</a></div>
+        <small class="muted">{{ user.full_name }}</small>
+      </div>
+    </div>
+
+    <div class="detail-stats">
+      <div class="stat">
+        <div class="value">{{ "{:,}".format(user.follower_count) }}</div>
+        <div class="muted">粉丝</div>
+      </div>
+      <div class="stat">
+        <div class="value">{{ "{:,}".format(user.following_count) }}</div>
+        <div class="muted">关注</div>
+      </div>
+      <div class="stat">
+        <div class="value">{{ "{:,}".format(user.posts_count) }}</div>
+        <div class="muted">帖子</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="muted">签名</div>
+      <div>{{ user.biography or "暂无签名" }}</div>
+    </div>
+
+    <div class="detail-meta">
+      <span>最后采集</span>
+      <span>{{ user.last_collected.strftime('%Y-%m-%d %H:%M') if user.last_collected else '-' }}</span>
+    </div>
+  </div>
+</div>
+
+{% if faq_items %}
+<section class="faq">
+  <h2>常见问题</h2>
+  <dl>
+    {% for item in faq_items %}
+    <dt>{{ item.q }}</dt>
+    <dd>{{ item.a }}</dd>
+    {% endfor %}
+  </dl>
+</section>
+{% endif %}
+
+{% if media.is_album %}
+<script>
+(() => {
+  const carousel = document.querySelector(".carousel");
+  if (!carousel) return;
+  const items = Array.from(carousel.querySelectorAll(".carousel-item"));
+  const indicator = carousel.querySelector(".carousel-indicator");
+  const prev = carousel.querySelector(".carousel-btn.prev");
+  const next = carousel.querySelector(".carousel-btn.next");
+  if (!items.length) return;
+  let index = 0;
+
+  const render = () => {
+    items.forEach((item, i) => item.classList.toggle("is-active", i === index));
+    if (indicator) indicator.textContent = `${index + 1} / ${items.length}`;
+  };
+
+  prev.addEventListener("click", () => {
+    index = (index - 1 + items.length) % items.length;
+    render();
+  });
+  next.addEventListener("click", () => {
+    index = (index + 1) % items.length;
+    render();
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

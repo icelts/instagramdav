@@ -64,6 +64,7 @@ class Media(Base):
     view_count = Column(Integer, default=0)
     media_url = Column(String(500))  # 本地存储路径
     thumbnail_url = Column(String(500))  # 缩略图路径
+    album_id = Column(String(50))  # 图集分组ID
     taken_at = Column(DateTime)
     collected_at = Column(DateTime, default=datetime.utcnow)
     created_at = Column(DateTime, default=datetime.utcnow)

@@ -5,9 +5,7 @@ load_dotenv()
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key'
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or (
-        'mysql+pymysql://douyinstagram:GatHER5CGmjCxeeA@125.212.244.39:3306/douyinstagram?charset=utf8mb4'
-    )
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///instagram_clone.db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME') or 'admin'
     ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD') or 'admin'

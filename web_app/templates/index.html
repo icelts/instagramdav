@@ -4,32 +4,83 @@
   <div class="brand">
     <div class="dot"></div>
     <div>
-      <div>Instagram Clone</div>
-      <small class="muted">快速预览 · 响应式瀑布流</small>
+      <h1 class="page-title">Instagram 采集展示</h1>
+      <p class="page-subtitle">📸 中文内容聚合 · 随机浏览采集图片</p>
     </div>
   </div>
-  <div class="badge">适配移动端 · 随机媒体预览</div>
+  <form class="search" method="get" action="/">
+    <input type="search" name="q" placeholder="🔍 搜索用户名或描述" value="{{ query }}">
+    <button type="submit">搜索</button>
+  </form>
 </div>
 
-<div class="grid">
-  {% for m in medias %}
-  <div class="card">
-    <div class="media">
-      <img src="{{ m.media_url }}" alt="{{ m.caption }}">
-      <div class="pill">@{{ m.username }}</div>
-    </div>
-    <div class="card-body">
-      <div class="caption">{{ m.caption or ' ' }}</div>
-      <div class="meta">
-        <span>{{ m.full_name or '@' + m.username }}</span>
-        <span>{{ m.taken_at[:10] if m.taken_at else '' }}</span>
-      </div>
-      <div class="stats">
-        <span>❤️ {{ m.likes }}</span>
-        <span>💬 {{ m.comments }}</span>
-      </div>
+<section class="hero">
+  <div class="hero-copy">
+    <h2>中文采集图库 · 发现更多高质量内容</h2>
+    <p>集中展示已采集的 Instagram 用户图片、资料和最新贴文，适合做素材发现、数据归档与内容分析。</p>
+    <div class="hero-tags">
+      <span>中文关键词</span>
+      <span>随机浏览</span>
+      <span>用户主页</span>
+      <span>高清大图</span>
     </div>
   </div>
+  <div class="hero-stats">
+    <div>
+      <strong>{{ medias|length }}</strong>
+      <span>本页内容</span>
+    </div>
+    <div>
+      <strong>{{ query and '搜索中' or '实时更新' }}</strong>
+      <span>采集状态</span>
+    </div>
+  </div>
+</section>
+
+<h2 class="section-title">最新采集内容</h2>
+<div class="grid">
+  {% for m in medias %}
+  <a class="card-link" href="{{ m.detail_url }}">
+    <div class="card">
+      <div class="media">
+        <img src="{{ m.media_url }}" alt="{{ m.caption }}" loading="lazy" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%25%22 height=%22100%25%22%3E%3Crect fill=%22%23e2e8f0%22 width=%22100%25%22 height=%22100%25%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%2394a3b8%22 font-size=%2216%22%3E📷 加载中%3C/text%3E%3C/svg%3E'">
+        <div class="pill">@{{ m.username }}</div>
+      </div>
+      <div class="card-body">
+        <div class="caption">{{ m.caption or ' ' }}</div>
+        <div class="meta">
+          <span>{{ m.full_name or '@' + m.username }}</span>
+          <span>{{ m.taken_at[:10] if m.taken_at else '' }}</span>
+        </div>
+        <div class="stats">
+          <span>❤️ {{ m.likes }}</span>
+          <span>💬 {{ m.comments }}</span>
+        </div>
+      </div>
+    </div>
+  </a>
   {% endfor %}
 </div>
+
+{% if not medias %}
+<div style="text-align: center; padding: 60px 20px; color: var(--muted);">
+  <div style="font-size: 48px; margin-bottom: 16px;">📭</div>
+  <div style="font-size: 18px; margin-bottom: 8px;">暂无内容</div>
+  <div style="font-size: 14px;">请先在后台添加目标用户并开始采集</div>
+</div>
+{% endif %}
+
+<section class="faq">
+  <h2>常见问题</h2>
+  <dl>
+    <dt>这里展示的数据来源是什么？</dt>
+    <dd>内容来自后台采集到的 Instagram 用户与贴文，展示的是已入库的公开信息。</dd>
+    <dt>为什么有些图片加载较慢？</dt>
+    <dd>图片会优先读取本地缓存，首次采集时需要下载，速度与网络和目标用户内容量有关。</dd>
+    <dt>如何查看某个目标用户的全部内容？</dt>
+    <dd>点击卡片上的用户名进入该用户主页，支持下拉加载更多贴文。</dd>
+    <dt>搜索支持哪些关键词？</dt>
+    <dd>支持用户名、昵称、描述中的中文关键词，也可直接输入目标用户名。</dd>
+  </dl>
+</section>
 {% endblock %}

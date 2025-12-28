@@ -4,6 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <title>{{ title or "Instagram Clone" }}</title>
+    <meta name="description" content="{{ description or '采集并展示 Instagram 用户图片与资料' }}">
+    <meta name="keywords" content="{{ keywords or 'Instagram,采集,图片,用户资料,用户主页,帖子,粉丝,中文' }}">
+    <meta name="robots" content="{{ robots or 'index,follow' }}">
+    <link rel="canonical" href="{{ canonical or request.url }}">
+    <meta property="og:title" content="{{ og_title or title or 'Instagram Clone' }}">
+    <meta property="og:description" content="{{ og_description or description or '采集并展示 Instagram 用户图片与资料' }}">
+    <meta property="og:type" content="{{ og_type or 'website' }}">
+    <meta property="og:url" content="{{ canonical or request.url }}">
+    {% if og_image %}
+    <meta property="og:image" content="{{ og_image }}">
+    {% endif %}
+    <meta name="twitter:card" content="{{ twitter_card or 'summary_large_image' }}">
+    <meta name="twitter:title" content="{{ og_title or title or 'Instagram Clone' }}">
+    <meta name="twitter:description" content="{{ og_description or description or '采集并展示 Instagram 用户图片与资料' }}">
+    {% if og_image %}
+    <meta name="twitter:image" content="{{ og_image }}">
+    {% endif %}
+    {% if json_ld %}
+    <script type="application/ld+json">{{ json_ld|safe }}</script>
+    {% endif %}
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>

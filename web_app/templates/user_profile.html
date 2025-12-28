@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="header">
+  <div class="brand">
+    <div class="dot"></div>
+    <div>
+      <h1 class="page-title">@{{ user.username }}</h1>
+      <p class="page-subtitle">{{ user.full_name or "Instagram User" }}</p>
+    </div>
+  </div>
+  <div class="detail-actions">
+    <a href="/">🏠 返回首页</a>
+    <a href="/admin">⚙️ 管理后台</a>
+  </div>
+</div>
+
+<div class="profile-card">
+  <div class="detail-user">
+    {% if user.profile_pic_url %}
+      <img class="avatar" src="{{ user.profile_pic_url }}" alt="{{ user.username }}">
+    {% else %}
+      <div class="avatar"></div>
+    {% endif %}
+    <div>
+      <div>@{{ user.username }}</div>
+      <small class="muted">{{ user.full_name }}</small>
+    </div>
+  </div>
+
+  <div class="detail-stats">
+    <div class="stat">
+      <div class="value">{{ "{:,}".format(user.follower_count or 0) }}</div>
+      <div class="muted">👥 粉丝</div>
+    </div>
+    <div class="stat">
+      <div class="value">{{ "{:,}".format(user.following_count or 0) }}</div>
+      <div class="muted">➕ 关注</div>
+    </div>
+    <div class="stat">
+      <div class="value">{{ "{:,}".format(user.posts_count or 0) }}</div>
+      <div class="muted">📸 帖子</div>
+    </div>
+  </div>
+
+  <div>
+    <div class="muted">✨ 简介</div>
+    <div>{{ user.biography or "暂无简介" }}</div>
+  </div>
+</div>
+
+<h2 class="section-title">最新采集贴文</h2>
+<div id="media-grid" class="grid" data-username="{{ user.username }}" data-next-page="{{ next_page }}">
+  {% for m in medias %}
+  <a class="card-link" href="{{ m.detail_url }}">
+    <div class="card">
+      <div class="media">
+        <img src="{{ m.media_url }}" alt="{{ m.caption }}">
+      </div>
+      <div class="card-body">
+        <div class="caption">{{ m.caption or ' ' }}</div>
+        <div class="meta">
+          <span>{{ m.taken_at[:10] if m.taken_at else '' }}</span>
+          <span>{{ m.media_type }}</span>
+        </div>
+      </div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+
+<div id="scroll-sentinel" class="scroll-sentinel">
+  {% if has_more %}
+    ⬇️ 向下滚动加载更多
+  {% else %}
+    ✅ 没有更多内容了
+  {% endif %}
+</div>
+
+{% if faq_items %}
+<section class="faq">
+  <h2>常见问题</h2>
+  <dl>
+    {% for item in faq_items %}
+    <dt>{{ item.q }}</dt>
+    <dd>{{ item.a }}</dd>
+    {% endfor %}
+  </dl>
+</section>
+{% endif %}
+
+<script>
+(() => {
+  const grid = document.getElementById("media-grid");
+  const sentinel = document.getElementById("scroll-sentinel");
+  if (!grid || !sentinel) return;
+
+  let nextPage = parseInt(grid.dataset.nextPage, 10);
+  if (!nextPage) return;
+  const username = grid.dataset.username;
+  let loading = false;
+
+  const createCard = (item) => {
+    const link = document.createElement("a");
+    link.className = "card-link";
+    link.href = item.detail_url;
+
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const media = document.createElement("div");
+    media.className = "media";
+
+    const img = document.createElement("img");
+    img.src = item.media_url || "";
+    img.alt = item.caption || "";
+    media.appendChild(img);
+
+    const body = document.createElement("div");
+    body.className = "card-body";
+
+    const caption = document.createElement("div");
+    caption.className = "caption";
+    caption.textContent = item.caption || " ";
+
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    const left = document.createElement("span");
+    left.textContent = (item.taken_at || "").slice(0, 10);
+    const right = document.createElement("span");
+    right.textContent = item.media_type || "";
+    meta.appendChild(left);
+    meta.appendChild(right);
+
+    body.appendChild(caption);
+    body.appendChild(meta);
+    card.appendChild(media);
+    card.appendChild(body);
+    link.appendChild(card);
+    return link;
+  };
+
+  const loadMore = async () => {
+    if (loading || !nextPage) return;
+    loading = true;
+    sentinel.textContent = "加载中...";
+    try {
+      const resp = await fetch(`/api/users/${encodeURIComponent(username)}/medias?page=${nextPage}`);
+      if (!resp.ok) throw new Error("fetch failed");
+      const data = await resp.json();
+      data.items.forEach((item) => grid.appendChild(createCard(item)));
+      if (data.has_more) {
+        nextPage += 1;
+        sentinel.textContent = "向下滚动加载更多";
+      } else {
+        nextPage = 0;
+        sentinel.textContent = "没有更多了";
+      }
+    } catch (err) {
+      sentinel.textContent = "加载失败，请稍后重试";
+    } finally {
+      loading = false;
+    }
+  };
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        loadMore();
+      }
+    },
+    { rootMargin: "200px" }
+  );
+  observer.observe(sentinel);
+})();
+</script>
+{% endblock %}

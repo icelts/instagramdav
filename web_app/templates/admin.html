@@ -9,39 +9,44 @@
     </div>
   </div>
   <div class="toolbar-actions">
-    <div class="badge">采集间隔：{{ interval }} 分钟</div>
-    <a class="ghost-btn" href="/logout">退出登录</a>
+    <div class="badge">⏱️ 采集间隔：{{ interval }} 分钟</div>
+    <a class="ghost-btn" href="/">🏠 返回前台</a>
+    <a class="ghost-btn" href="/logout">🚪 退出登录</a>
   </div>
 </div>
 
 <div class="stat-grid">
   <div class="stat-card">
-    <div class="label">采集账号</div>
+    <div class="label">👤 采集账号</div>
     <div class="value">{{ accounts|length }}</div>
     <span class="stat-hint">登录 Instagram 的机器人账号</span>
   </div>
   <div class="stat-card">
-    <div class="label">目标用户</div>
+    <div class="label">🎯 目标用户</div>
     <div class="value">{{ users|length }}</div>
     <span class="stat-hint">当前正在跟踪的用户</span>
   </div>
   <div class="stat-card">
-    <div class="label">计划任务</div>
+    <div class="label">⚙️ 计划任务</div>
     <div class="value">{{ jobs|length }}</div>
     <span class="stat-hint">APScheduler 队列</span>
   </div>
   <div class="stat-card">
-    <div class="label">采集频率</div>
+    <div class="label">⏰ 采集频率</div>
     <div class="value">{{ interval }}m</div>
     <span class="stat-hint">分钟为单位</span>
   </div>
 </div>
 
+{% if error %}
+<div class="alert">{{ error }}</div>
+{% endif %}
+
 <div class="panel-grid">
   <div class="panel">
     <div class="panel-head">
       <div>
-        <p class="panel-title">新增采集账号</p>
+        <p class="panel-title">➕ 新增采集账号</p>
         <p class="panel-sub">配置登录凭据与代理</p>
       </div>
     </div>
@@ -60,14 +65,14 @@
       <label>TOTP 密钥 <span class="muted">(可选)</span>
         <input name="totp_secret" placeholder="绑定双因素验证码时使用">
       </label>
-      <button type="submit">保存账号</button>
+      <button type="submit">💾 保存账号</button>
     </form>
   </div>
 
   <div class="panel">
     <div class="panel-head">
       <div>
-        <p class="panel-title">新增目标用户</p>
+        <p class="panel-title">🎯 新增目标用户</p>
         <p class="panel-sub">可选择立即采集一次</p>
       </div>
     </div>
@@ -76,16 +81,16 @@
         <input name="username" required placeholder="目标用户名">
       </label>
       <label class="inline">
-        <input type="checkbox" name="immediate_collect" value="1"> 立即采集一轮
+        <input type="checkbox" name="immediate_collect" value="1"> ⚡ 立即采集一轮
       </label>
-      <button type="submit">保存目标</button>
+      <button type="submit">💾 保存目标</button>
     </form>
   </div>
 
   <div class="panel">
     <div class="panel-head">
       <div>
-        <p class="panel-title">采集周期</p>
+        <p class="panel-title">⏱️ 采集周期</p>
         <p class="panel-sub">灵活调整任务频率</p>
       </div>
     </div>
@@ -93,7 +98,7 @@
       <label>间隔（分钟）
         <input name="minutes" type="number" min="1" value="{{ interval }}">
       </label>
-      <button type="submit">更新周期</button>
+      <button type="submit">🔄 更新周期</button>
     </form>
   </div>
 </div>
@@ -101,20 +106,21 @@
 <div class="panel">
   <div class="panel-head">
     <div>
-      <p class="panel-title">账号列表</p>
+      <p class="panel-title">📋 账号列表</p>
       <p class="panel-sub">已保存的采集账号与代理</p>
     </div>
   </div>
   <div class="table wide accounts">
-    <div class="thead"><span>账号</span><span>代理</span><span>操作</span></div>
+    <div class="thead"><span>账号</span><span>状态</span><span>代理</span><span>操作</span></div>
     {% for a in accounts %}
     <div class="row">
       <span>{{ a.username }}</span>
-      <span>{{ a.proxy or '直连' }}</span>
+      <span class="status" title="{{ a.status_detail or '' }}">{{ a.status }}</span>
+      <span>{{ a.proxy or '🔗 直连' }}</span>
       <span class="actions">
         <form method="post" action="/admin/remove_account">
           <input type="hidden" name="account_id" value="{{ a.id }}">
-          <button type="submit" class="danger">删除</button>
+          <button type="submit" class="danger">🗑️ 删除</button>
         </form>
       </span>
     </div>
@@ -125,7 +131,68 @@
 <div class="panel">
   <div class="panel-head">
     <div>
-      <p class="panel-title">目标用户</p>
+      <p class="panel-title">📈 采集新增趋势</p>
+      <p class="panel-sub">每日新增采集数量趋势</p>
+    </div>
+    <div class="chart-meta">
+      <span class="muted">峰值：{{ stats_max }}</span>
+      {% if user_filter %}
+      <span class="badge">用户：@{{ user_filter }}</span>
+      {% else %}
+      <span class="badge">全部用户</span>
+      {% endif %}
+    </div>
+  </div>
+  <form method="get" action="/admin" class="chart-filter">
+    <label>范围
+      <select name="range">
+        <option value="7" {% if range_days == 7 %}selected{% endif %}>7 天</option>
+        <option value="30" {% if range_days == 30 %}selected{% endif %}>30 天</option>
+        <option value="90" {% if range_days == 90 %}selected{% endif %}>90 天</option>
+      </select>
+    </label>
+    <label>用户
+      <select name="user">
+        <option value="">全部</option>
+        {% for u in users %}
+        <option value="{{ u.username }}" {% if user_filter == u.username %}selected{% endif %}>@{{ u.username }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">筛选</button>
+  </form>
+  {% if stats_max %}
+  <div class="chart">
+    <svg viewBox="0 0 100 60" preserveAspectRatio="none" class="chart-svg">
+      <defs>
+        <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.35" />
+          <stop offset="100%" stop-color="var(--accent)" stop-opacity="0.05" />
+        </linearGradient>
+      </defs>
+      <polyline points="{{ chart_polyline }}" fill="none" stroke="var(--accent)" stroke-width="1.8" />
+      <polygon points="{{ chart_area }}" fill="url(#chartFill)" />
+      {% for point in chart_points %}
+      <circle cx="{{ point.x }}" cy="{{ point.y }}" r="1.4" fill="var(--accent)">
+        <title>{{ point.day }} · {{ point.count }}</title>
+      </circle>
+      {% endfor %}
+    </svg>
+    <div class="chart-axis">
+      <span>{{ stats[0].day if stats else '' }}</span>
+      <span>最近 {{ range_days }} 天</span>
+      <span>{{ stats[-1].day if stats else '' }}</span>
+    </div>
+  </div>
+  {% else %}
+  <div class="muted" style="padding: 16px 0;">暂无采集数据</div>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <div>
+      <p class="panel-title">👥 目标用户</p>
       <p class="panel-sub">状态与管理</p>
     </div>
   </div>
@@ -134,11 +201,11 @@
     {% for u in users %}
     <div class="row">
       <span>{{ u.username }}</span>
-      <span>{{ '活跃' if u.is_active else '停用' }}</span>
+      <span>{{ '✅ 活跃' if u.is_active else '⏸️ 停用' }}</span>
       <span class="actions">
         <form method="post" action="/admin/remove_user">
           <input type="hidden" name="user_id" value="{{ u.id }}">
-          <button type="submit" class="danger">删除</button>
+          <button type="submit" class="danger">🗑️ 删除</button>
         </form>
       </span>
     </div>
@@ -149,7 +216,60 @@
 <div class="panel">
   <div class="panel-head">
     <div>
-      <p class="panel-title">计划任务</p>
+      <p class="panel-title">📸 采集媒体列表</p>
+      <p class="panel-sub">每页最多显示 20 条</p>
+    </div>
+    <div class="pagination">
+      {% if has_prev %}
+        <a href="/admin?page={{ page - 1 }}{{ query_suffix }}">上一页</a>
+      {% endif %}
+      <span>第 {{ page }} / {{ total_pages }} 页</span>
+      {% if has_next %}
+        <a href="/admin?page={{ page + 1 }}{{ query_suffix }}">下一页</a>
+      {% endif %}
+    </div>
+  </div>
+  {% if medias %}
+  <div class="table wide medias">
+    <div class="thead">
+      <span>ID</span>
+      <span>用户</span>
+      <span>类型</span>
+      <span>时间</span>
+      <span>互动</span>
+      <span>描述</span>
+      <span>详情</span>
+    </div>
+    {% for m in medias %}
+    <div class="row">
+      <span>#{{ m.id }}</span>
+      <span>@{{ m.username }}</span>
+      <span>{{ m.media_type or '-' }}</span>
+      <span>{{ m.taken_at[:10] if m.taken_at else '-' }}</span>
+      <span>❤️ {{ m.likes }} · 💬 {{ m.comments }}</span>
+      <span class="muted">{{ m.caption|truncate(80) }}</span>
+      <span><a href="{{ m.detail_url }}">查看</a></span>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="muted" style="padding: 20px 0;">暂无采集数据</div>
+  {% endif %}
+  <div class="pagination pagination-bottom">
+    {% if has_prev %}
+      <a href="/admin?page={{ page - 1 }}{{ query_suffix }}">上一页</a>
+    {% endif %}
+    <span>第 {{ page }} / {{ total_pages }} 页</span>
+    {% if has_next %}
+      <a href="/admin?page={{ page + 1 }}{{ query_suffix }}">下一页</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <div>
+      <p class="panel-title">📅 计划任务</p>
       <p class="panel-sub">当前调度队列</p>
     </div>
   </div>

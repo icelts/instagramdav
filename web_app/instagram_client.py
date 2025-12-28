@@ -39,8 +39,8 @@ class InstagramClientManager:
             if account.session_data:
                 try:
                     client.set_settings(json.loads(account.session_data))
-                    client.login(account.username, self.cipher.decrypt(account.password))
-                    logger.info("账号 %s 使用 session 登录成功", account.username)
+                    self._login_account(client, account, session, relogin=True)
+                    logger.info("账号 %s 使用 session 重新登录成功", account.username)
                 except Exception as exc:
                     logger.warning("账号 %s session 登录失败，将尝试普通登录: %s", account.username, exc)
                     self._login_account(client, account, session)
@@ -52,7 +52,7 @@ class InstagramClientManager:
 
         return self.clients[account.id]
 
-    def _login_account(self, client: Client, account: InstagramAccount, session):
+    def _login_account(self, client: Client, account: InstagramAccount, session, relogin: bool = False):
         try:
             password = self.cipher.decrypt(account.password)
             totp_code = None
@@ -64,9 +64,9 @@ class InstagramClientManager:
                     logger.warning("账号 %s TOTP 生成失败: %s", account.username, exc)
 
             if totp_code:
-                client.login(account.username, password, verification_code=totp_code)
+                client.login(account.username, password, relogin=relogin, verification_code=totp_code)
             else:
-                client.login(account.username, password)
+                client.login(account.username, password, relogin=relogin)
             account.session_data = json.dumps(client.get_settings())
             account.last_used = datetime.utcnow()
             session.commit()
@@ -84,6 +84,25 @@ class InstagramClientManager:
             session.commit()
             self._log_action(session, account.id, None, "login", f"账号 {account.username} 登录失败: {exc}", "error")
             raise
+
+    def login_and_get_settings(
+        self,
+        username: str,
+        password: str,
+        proxy: Optional[str] = None,
+        totp_secret: Optional[str] = None,
+    ) -> str:
+        client = Client()
+        if proxy:
+            client.set_proxy(proxy)
+        totp_code = None
+        if totp_secret:
+            totp_code = pyotp.TOTP(totp_secret).now()
+        if totp_code:
+            client.login(username, password, verification_code=totp_code)
+        else:
+            client.login(username, password)
+        return json.dumps(client.get_settings())
 
     def _log_action(self, session, account_id: int, target_user_id: Optional[int], action: str, message: str, status: str):
         log = CollectionLog(
@@ -134,7 +153,9 @@ class InstagramClientManager:
             target_user.follower_count = user_info.follower_count
             target_user.following_count = user_info.following_count
             target_user.posts_count = user_info.media_count
-            target_user.profile_pic_url = user_info.profile_pic_url
+            profile_pic_url = str(user_info.profile_pic_url) if user_info.profile_pic_url else None
+            local_profile = self._download_profile_pic(client, profile_pic_url, target_user.username)
+            target_user.profile_pic_url = local_profile or profile_pic_url
             target_user.last_collected = datetime.utcnow()
             session.commit()
 
@@ -181,9 +202,64 @@ class InstagramClientManager:
 
     def _collect_medias(self, session, client: Client, target_user: TargetUser, account: InstagramAccount) -> int:
         media_count = 0
+        commit_every = 5
         try:
             medias = client.user_medias(target_user.user_id, amount=Config.MAX_POSTS_PER_USER)
             for media in medias:
+                resources = media.resources if media.media_type == 8 and media.resources else []
+                if resources:
+                    for idx, resource in enumerate(resources):
+                        resource_id = getattr(resource, "pk", None) or f"{media.pk}_{idx}"
+                        existing_media = session.query(Media).filter_by(media_id=str(resource_id)).first()
+                        if existing_media:
+                            continue
+
+                        media_record = Media(
+                            media_id=str(resource_id),
+                            user_id=target_user.id,
+                            media_type=self._get_media_type(resource.media_type),
+                            caption=media.caption_text or "",
+                            like_count=media.like_count,
+                            comment_count=media.comment_count,
+                            view_count=getattr(media, "view_count", 0),
+                            taken_at=media.taken_at,
+                            album_id=str(media.pk),
+                        )
+
+                        thumbnail_url = getattr(resource, "thumbnail_url", None)
+                        try:
+                            media_path = self._download_media(client, resource, target_user.username)
+                            if media_path:
+                                media_record.media_url = media_path
+                            if resource.media_type == 2:
+                                if thumbnail_url:
+                                    thumbnail_path = self._download_thumbnail(
+                                        client, thumbnail_url, target_user.username, str(resource_id)
+                                    )
+                                    if thumbnail_path:
+                                        media_record.thumbnail_url = thumbnail_path
+                                if not media_record.thumbnail_url and media_path:
+                                    thumbnail_path = self._generate_thumbnail(media_path)
+                                    if thumbnail_path:
+                                        media_record.thumbnail_url = thumbnail_path
+                        except Exception as exc:
+                            logger.warning("下载媒体 %s 失败: %s", resource_id, exc)
+
+                        if not media_record.thumbnail_url and thumbnail_url:
+                            media_record.thumbnail_url = str(thumbnail_url)
+                        if not media_record.media_url:
+                            if getattr(resource, "video_url", None):
+                                media_record.media_url = str(resource.video_url)
+                            elif getattr(resource, "thumbnail_url", None):
+                                media_record.media_url = str(resource.thumbnail_url)
+
+                        session.add(media_record)
+                        media_count += 1
+                        if media_count % commit_every == 0:
+                            session.commit()
+                        time.sleep(Config.DELAY_BETWEEN_REQUESTS)
+                    continue
+
                 existing_media = session.query(Media).filter_by(media_id=str(media.pk)).first()
                 if existing_media:
                     continue
@@ -199,19 +275,37 @@ class InstagramClientManager:
                     taken_at=media.taken_at,
                 )
 
+                thumbnail_url = getattr(media, "thumbnail_url", None)
                 try:
                     media_path = self._download_media(client, media, target_user.username)
                     if media_path:
                         media_record.media_url = media_path
-                        if media.media_type in [2, 8]:  # Video or Album
+                    if media.media_type == 2:
+                        if thumbnail_url:
+                            thumbnail_path = self._download_thumbnail(
+                                client, thumbnail_url, target_user.username, str(media.pk)
+                            )
+                            if thumbnail_path:
+                                media_record.thumbnail_url = thumbnail_path
+                        if not media_record.thumbnail_url and media_path:
                             thumbnail_path = self._generate_thumbnail(media_path)
                             if thumbnail_path:
                                 media_record.thumbnail_url = thumbnail_path
                 except Exception as exc:
                     logger.warning("下载媒体 %s 失败: %s", media.pk, exc)
 
+                if not media_record.thumbnail_url and thumbnail_url:
+                    media_record.thumbnail_url = str(thumbnail_url)
+                if not media_record.media_url:
+                    if getattr(media, "video_url", None):
+                        media_record.media_url = str(media.video_url)
+                    elif getattr(media, "thumbnail_url", None):
+                        media_record.media_url = str(media.thumbnail_url)
+
                 session.add(media_record)
                 media_count += 1
+                if media_count % commit_every == 0:
+                    session.commit()
                 time.sleep(Config.DELAY_BETWEEN_REQUESTS)
 
             session.commit()
@@ -238,26 +332,53 @@ class InstagramClientManager:
             return "album"
         return "unknown"
 
+    def _download_profile_pic(self, client: Client, url: Optional[str], username: str) -> Optional[str]:
+        if not url:
+            return None
+        user_folder = os.path.join(Config.MEDIA_FOLDER, username)
+        os.makedirs(user_folder, exist_ok=True)
+        filename = f"{username}_profile"
+        try:
+            path = client.photo_download_by_url(url, filename, user_folder)
+            return str(path)
+        except Exception as exc:
+            logger.warning("下载头像失败: %s", exc)
+            return None
+
     def _download_media(self, client: Client, media, username: str) -> Optional[str]:
         user_folder = os.path.join(Config.MEDIA_FOLDER, username)
         os.makedirs(user_folder, exist_ok=True)
+        filename = f"{username}_{getattr(media, 'pk', 'media')}"
 
         if media.media_type == 1:
-            path = client.photo_download(media.pk)
+            url = getattr(media, "thumbnail_url", None)
+            if url:
+                path = client.photo_download_by_url(url, filename, user_folder)
+            else:
+                path = client.photo_download(media.pk, folder=user_folder)
         elif media.media_type == 2:
-            path = client.video_download(media.pk)
-        elif media.media_type == 8:
-            paths = client.album_download(media.pk)
-            path = paths[0] if paths else None
+            url = getattr(media, "video_url", None)
+            if url:
+                path = client.video_download_by_url(url, filename, user_folder)
+            else:
+                path = client.video_download(media.pk, folder=user_folder)
         else:
             return None
 
-        if path:
-            filename = f"{media.pk}_{os.path.basename(path)}"
-            new_path = os.path.join(user_folder, filename)
-            os.replace(path, new_path)
-            return new_path
-        return None
+        return str(path) if path else None
+
+    def _download_thumbnail(self, client: Client, url: Optional[str], username: str, media_id: str) -> Optional[str]:
+        if not url:
+            return None
+        thumbnail_folder = os.path.join(Config.MEDIA_FOLDER, "thumbnails")
+        os.makedirs(thumbnail_folder, exist_ok=True)
+        filename = f"thumb_{username}_{media_id}"
+        try:
+            path = client.photo_download_by_url(url, filename, thumbnail_folder)
+            return str(path) if path else None
+        except Exception as exc:
+            logger.warning("下载缩略图失败: %s", exc)
+            return None
 
     def _generate_thumbnail(self, video_path: str) -> Optional[str]:
         try:
