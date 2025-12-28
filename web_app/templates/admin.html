@@ -131,6 +131,30 @@
 <div class="panel">
   <div class="panel-head">
     <div>
+      <p class="panel-title">💬 最新留言</p>
+      <p class="panel-sub">最近 20 条留言，点击邮箱可回复</p>
+    </div>
+  </div>
+  {% if messages %}
+  <div class="table wide messages">
+    <div class="thead"><span>时间</span><span>昵称</span><span>邮箱</span><span>内容</span></div>
+    {% for msg in messages %}
+    <div class="row">
+      <span>{{ msg.created_at.strftime('%Y-%m-%d %H:%M') if msg.created_at else '' }}</span>
+      <span>{{ msg.name }}</span>
+      <span><a href="mailto:{{ msg.email }}">{{ msg.email }}</a></span>
+      <span class="muted">{{ msg.content|truncate(80) }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="muted" style="padding: 16px 0;">暂无留言</div>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <div>
       <p class="panel-title">📈 采集新增趋势</p>
       <p class="panel-sub">每日新增采集数量趋势</p>
     </div>

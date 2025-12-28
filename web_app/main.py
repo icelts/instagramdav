@@ -4,6 +4,7 @@ import math
 import os
 import random
 import secrets
+import smtplib
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
@@ -21,11 +22,12 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 from urllib.parse import quote, urlencode
 from xml.sax.saxutils import escape
+from email.message import EmailMessage
 
 from config import Config
 from database import Base, SessionLocal, engine
 from instagram_client import build_client_manager
-from models import CollectionLog, CollectionTask, InstagramAccount, Media, TargetUser
+from models import CollectionLog, CollectionTask, InstagramAccount, Media, TargetUser, Message
 from scheduler import CollectionScheduler
 from security import CredentialCipher
 
@@ -178,6 +180,39 @@ def _absolute_url(request: Request, path: Optional[str]) -> Optional[str]:
     return f"{base_url}/{path}"
 
 
+def _send_message_notification(request: Request, name: str, email: str, content: str) -> Optional[str]:
+    if not Config.SMTP_HOST or not Config.NOTIFY_EMAIL:
+        return None
+    msg = EmailMessage()
+    msg["Subject"] = f"新留言：{name}"
+    msg["From"] = Config.SMTP_FROM or Config.NOTIFY_EMAIL
+    msg["To"] = Config.NOTIFY_EMAIL
+    msg["Reply-To"] = email
+    base_url = str(request.base_url).rstrip("/")
+    msg.set_content(
+        "\n".join(
+            [
+                "收到新的留言：",
+                f"姓名：{name}",
+                f"邮箱：{email}",
+                f"内容：{content}",
+                f"查看页面：{base_url}/guestbook",
+            ]
+        )
+    )
+    try:
+        with smtplib.SMTP(Config.SMTP_HOST, Config.SMTP_PORT, timeout=10) as smtp:
+            if Config.SMTP_USE_TLS:
+                smtp.starttls()
+            if Config.SMTP_USER and Config.SMTP_PASSWORD:
+                smtp.login(Config.SMTP_USER, Config.SMTP_PASSWORD)
+            smtp.send_message(msg)
+        return None
+    except Exception as exc:
+        logger.warning("发送留言通知失败: %s", exc)
+        return str(exc)
+
+
 def _safe_next_path(raw: str) -> str:
     if not raw or not raw.startswith("/"):
         return "/admin"
@@ -211,6 +246,7 @@ def sitemap(request: Request, db: Session = Depends(get_db)):
         urls.append(f"<url><loc>{loc}</loc>{lastmod_str}</url>")
 
     add_url("/")
+    add_url("/guestbook")
 
     users = db.query(TargetUser).all()
     for user in users:
@@ -538,6 +574,63 @@ def homepage(request: Request, db: Session = Depends(get_db), q: Optional[str] =
                 ensure_ascii=False,
             ),
         },
+    )
+
+
+@app.get("/guestbook", response_class=HTMLResponse)
+def guestbook_page(
+    request: Request,
+    db: Session = Depends(get_db),
+    status: Optional[str] = Query(None),
+    error: Optional[str] = Query(None),
+):
+    messages = (
+        db.query(Message)
+        .order_by(Message.created_at.desc())
+        .limit(50)
+        .all()
+    )
+    return templates.TemplateResponse(
+        "guestbook.html",
+        {
+            "request": request,
+            "messages": messages,
+            "status": status,
+            "error": error,
+            "title": "留言板 · Instagram Clone",
+            "description": "留言板：提交问题与建议，我们将通过邮件回复。",
+            "keywords": "留言板,反馈,问题,建议,中文,联系",
+        },
+    )
+
+
+@app.post("/guestbook")
+def guestbook_submit(
+    request: Request,
+    name: str = Form(...),
+    email: str = Form(...),
+    content: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    name = name.strip()
+    email = email.strip()
+    content = content.strip()
+    if not name or not email or not content:
+        return RedirectResponse(f"/guestbook?error={quote('请填写完整信息')}", status_code=303)
+    if len(content) > 1000:
+        return RedirectResponse(f"/guestbook?error={quote('留言内容过长')}", status_code=303)
+    msg = Message(name=name, email=email, content=content)
+    db.add(msg)
+    db.commit()
+    mail_error = _send_message_notification(request, name, email, content)
+    if mail_error:
+        return RedirectResponse(
+            f"/guestbook?status={quote('已保存，但邮件发送失败')}",
+            status_code=303,
+        )
+    return RedirectResponse(
+        f"/guestbook?status={quote('留言已提交，我们会通过邮件回复')}",
+        status_code=303,
     )
 
 
@@ -924,6 +1017,12 @@ def admin_page(
                 "status_detail": status_detail,
             }
         )
+    messages = (
+        db.query(Message)
+        .order_by(Message.created_at.desc())
+        .limit(20)
+        .all()
+    )
     users = db.query(TargetUser).all()
     if range_days not in {7, 30, 90}:
         range_days = 30
@@ -1040,6 +1139,7 @@ def admin_page(
             "user_filter": user_filter,
             "query_suffix": query_suffix,
             "filtered_user": filtered_user,
+            "messages": messages,
         },
     )
 
