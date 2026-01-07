@@ -43,7 +43,7 @@
   <a class="card-link" href="{{ m.detail_url }}">
     <div class="card">
       <div class="media">
-        <img src="{{ m.media_url }}" alt="{{ m.caption }}" loading="lazy" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%25%22 height=%22100%25%22%3E%3Crect fill=%22%23e2e8f0%22 width=%22100%25%22 height=%22100%25%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%2394a3b8%22 font-size=%2216%22%3E📷 加载中%3C/text%3E%3C/svg%3E'">
+        <img src="{{ m.media_url }}" alt="{{ m.caption or ('@' ~ m.username ~ ' 贴文') }}" loading="lazy" decoding="async" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%25%22 height=%22100%25%22%3E%3Crect fill=%22%23e2e8f0%22 width=%22100%25%22 height=%22100%25%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%2394a3b8%22 font-size=%2216%22%3E📷 加载中%3C/text%3E%3C/svg%3E'">
         <div class="pill">@{{ m.username }}</div>
       </div>
       <div class="card-body">

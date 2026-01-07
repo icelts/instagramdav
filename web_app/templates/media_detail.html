@@ -27,7 +27,7 @@
                 <source src="{{ item.media_url }}" type="video/mp4">
               </video>
             {% else %}
-              <img src="{{ item.media_url }}" alt="{{ media.caption }}">
+              <img src="{{ item.media_url }}" alt="{{ media.caption or ('@' ~ user.username ~ ' 图集 第' ~ loop.index ~ '张') }}" decoding="async">
             {% endif %}
           </div>
           {% endfor %}
@@ -41,7 +41,7 @@
           <source src="{{ media.media_url }}" type="video/mp4">
         </video>
       {% else %}
-        <img src="{{ media.media_url }}" alt="{{ media.caption }}">
+        <img src="{{ media.media_url }}" alt="{{ media.caption or ('@' ~ user.username ~ ' 贴文') }}" decoding="async">
       {% endif %}
     {% endif %}
     <div class="card-body">

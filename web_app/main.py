@@ -558,18 +558,34 @@ def homepage(request: Request, db: Session = Depends(get_db), q: Optional[str] =
             "description": "随机浏览采集到的 Instagram 图片与用户信息",
             "keywords": "Instagram,采集,图片,用户主页,帖子,中文,展示",
             "robots": "noindex,follow" if q else "index,follow",
+            "canonical": f"{base_url}/",
             "json_ld": json.dumps(
                 {
                     "@context": "https://schema.org",
-                    "@type": "WebSite",
-                    "name": "Instagram 采集展示",
-                    "url": base_url,
-                    "inLanguage": "zh-CN",
-                    "potentialAction": {
-                        "@type": "SearchAction",
-                        "target": f"{base_url}/?q={{search_term_string}}",
-                        "query-input": "required name=search_term_string",
-                    },
+                    "@graph": [
+                        {
+                            "@type": "WebSite",
+                            "name": "Instagram 采集展示",
+                            "url": base_url,
+                            "inLanguage": "zh-CN",
+                            "potentialAction": {
+                                "@type": "SearchAction",
+                                "target": f"{base_url}/?q={{search_term_string}}",
+                                "query-input": "required name=search_term_string",
+                            },
+                        },
+                        {
+                            "@type": "BreadcrumbList",
+                            "itemListElement": [
+                                {
+                                    "@type": "ListItem",
+                                    "position": 1,
+                                    "name": "首页",
+                                    "item": f"{base_url}/",
+                                }
+                            ],
+                        },
+                    ],
                 },
                 ensure_ascii=False,
             ),
@@ -584,6 +600,7 @@ def guestbook_page(
     status: Optional[str] = Query(None),
     error: Optional[str] = Query(None),
 ):
+    base_url = str(request.base_url).rstrip("/")
     messages = (
         db.query(Message)
         .order_by(Message.created_at.desc())
@@ -600,6 +617,32 @@ def guestbook_page(
             "title": "留言板 · Instagram Clone",
             "description": "留言板：提交问题与建议，我们将通过邮件回复。",
             "keywords": "留言板,反馈,问题,建议,中文,联系",
+            "canonical": f"{base_url}/guestbook",
+            "json_ld": json.dumps(
+                {
+                    "@context": "https://schema.org",
+                    "@graph": [
+                        {
+                            "@type": "BreadcrumbList",
+                            "itemListElement": [
+                                {
+                                    "@type": "ListItem",
+                                    "position": 1,
+                                    "name": "首页",
+                                    "item": f"{base_url}/",
+                                },
+                                {
+                                    "@type": "ListItem",
+                                    "position": 2,
+                                    "name": "留言板",
+                                    "item": f"{base_url}/guestbook",
+                                },
+                            ],
+                        }
+                    ],
+                },
+                ensure_ascii=False,
+            ),
         },
     )
 
@@ -670,6 +713,7 @@ def _render_user_profile(
     total = query.count()
     medias = query.offset((page - 1) * per_page).limit(per_page).all()
     items = []
+    item_list = []
     for media in medias:
         media_url = _public_media_url(media.thumbnail_url or media.media_url)
         if media.media_type in {"video", "reel", "igtv"} and not media.thumbnail_url:
@@ -684,7 +728,29 @@ def _render_user_profile(
                 "detail_url": f"/m/{media.id}",
             }
         )
+    for idx, media in enumerate(medias, 1):
+        media_public = _public_media_url(media.media_url) or _public_media_url(media.thumbnail_url)
+        media_abs = _absolute_url(request, media_public)
+        if media_abs and media_abs.startswith("data:"):
+            media_abs = None
+        entry = {
+            "@type": "ListItem",
+            "position": idx,
+            "url": f"{base_url}/m/{media.id}",
+        }
+        if media.caption:
+            entry["name"] = media.caption
+        if media_abs:
+            entry["image"] = media_abs
+        item_list.append(entry)
     has_more = page * per_page < total
+    canonical = f"{base_url}/{user.username}"
+    if page > 1:
+        canonical = f"{base_url}/{user.username}?page={page}"
+    prev_url = None
+    if page > 1:
+        prev_url = f"{base_url}/{user.username}" if page == 2 else f"{base_url}/{user.username}?page={page - 1}"
+    next_url = f"{base_url}/{user.username}?page={page + 1}" if has_more else None
     return templates.TemplateResponse(
         "user_profile.html",
         {
@@ -706,8 +772,11 @@ def _render_user_profile(
             "next_page": page + 1 if has_more else None,
             "title": f"@{user.username} · 用户主页",
             "description": user.biography or f"查看 @{user.username} 的最新采集图片与资料",
-            "og_image": profile_pic_url if profile_pic_url else None,
+            "og_image": profile_pic_abs or profile_pic_url if profile_pic_url else None,
             "keywords": f"Instagram,采集,用户主页,{user.username},图片,帖子,粉丝,中文",
+            "canonical": canonical,
+            "prev_url": prev_url,
+            "next_url": next_url,
             "json_ld": json.dumps(
                 {
                     "@context": "https://schema.org",
@@ -724,6 +793,30 @@ def _render_user_profile(
                                 "description": user.biography or "",
                                 "image": profile_pic_abs,
                             },
+                        },
+                        {
+                            "@type": "ItemList",
+                            "name": f"@{user.username} 贴文列表",
+                            "numberOfItems": total,
+                            "itemListOrder": "https://schema.org/ItemListOrderDescending",
+                            "itemListElement": item_list,
+                        },
+                        {
+                            "@type": "BreadcrumbList",
+                            "itemListElement": [
+                                {
+                                    "@type": "ListItem",
+                                    "position": 1,
+                                    "name": "首页",
+                                    "item": f"{base_url}/",
+                                },
+                                {
+                                    "@type": "ListItem",
+                                    "position": 2,
+                                    "name": f"@{user.username}",
+                                    "item": f"{base_url}/{user.username}",
+                                },
+                            ],
                         },
                         {
                             "@type": "FAQPage",
@@ -813,6 +906,10 @@ def media_detail(media_id: int, request: Request, db: Session = Depends(get_db))
     thumbnail_url = _public_media_url(media.thumbnail_url)
     media_url_abs = _absolute_url(request, media_url)
     thumbnail_abs = _absolute_url(request, thumbnail_url)
+    if media_url_abs and media_url_abs.startswith("data:"):
+        media_url_abs = None
+    if thumbnail_abs and thumbnail_abs.startswith("data:"):
+        thumbnail_abs = None
     is_video = media.media_type in {"video", "reel", "igtv"}
     album_items = []
     if media.album_id:
@@ -859,6 +956,70 @@ def media_detail(media_id: int, request: Request, db: Session = Depends(get_db))
                 "a": "图集贴文支持左右按钮翻页，逐张查看图片或视频。",
             },
         )
+    media_object = None
+    if is_video:
+        if media_url_abs:
+            media_object = {
+                "@type": "VideoObject",
+                "contentUrl": media_url_abs,
+                "thumbnailUrl": thumbnail_abs,
+                "uploadDate": media.taken_at.isoformat() if media.taken_at else None,
+            }
+    else:
+        if media_url_abs or thumbnail_abs:
+            media_object = {
+                "@type": "ImageObject",
+                "contentUrl": media_url_abs or thumbnail_abs,
+                "thumbnailUrl": thumbnail_abs or media_url_abs,
+                "uploadDate": media.taken_at.isoformat() if media.taken_at else None,
+            }
+    graph = [
+        {
+            "@type": "SocialMediaPosting",
+            "headline": media.caption or f"@{user.username} 的贴文",
+            "author": {"@type": "Person", "name": user.username},
+            "datePublished": media.taken_at.isoformat() if media.taken_at else None,
+            "image": thumbnail_abs or media_url_abs,
+            "url": f"{base_url}/m/{media.id}",
+            "inLanguage": "zh-CN",
+        },
+        {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+                {
+                    "@type": "ListItem",
+                    "position": 1,
+                    "name": "首页",
+                    "item": f"{base_url}/",
+                },
+                {
+                    "@type": "ListItem",
+                    "position": 2,
+                    "name": f"@{user.username}",
+                    "item": f"{base_url}/{user.username}",
+                },
+                {
+                    "@type": "ListItem",
+                    "position": 3,
+                    "name": "贴文详情",
+                    "item": f"{base_url}/m/{media.id}",
+                },
+            ],
+        },
+        {
+            "@type": "FAQPage",
+            "mainEntity": [
+                {
+                    "@type": "Question",
+                    "name": item["q"],
+                    "acceptedAnswer": {"@type": "Answer", "text": item["a"]},
+                }
+                for item in faq_items
+            ],
+        },
+    ]
+    if media_object:
+        graph.insert(1, media_object)
     return templates.TemplateResponse(
         "media_detail.html",
         {
@@ -893,32 +1054,12 @@ def media_detail(media_id: int, request: Request, db: Session = Depends(get_db))
             "description": media.caption or f"查看 @{user.username} 的采集贴文详情",
             "keywords": f"Instagram,采集,贴文详情,{user.username},图片,视频,中文",
             "og_type": "article",
-            "og_image": thumbnail_url or media_url,
+            "og_image": thumbnail_abs or media_url_abs or thumbnail_url or media_url,
+            "canonical": f"{base_url}/m/{media.id}",
             "json_ld": json.dumps(
                 {
                     "@context": "https://schema.org",
-                    "@graph": [
-                        {
-                            "@type": "SocialMediaPosting",
-                            "headline": media.caption or f"@{user.username} 的贴文",
-                            "author": {"@type": "Person", "name": user.username},
-                            "datePublished": media.taken_at.isoformat() if media.taken_at else None,
-                            "image": thumbnail_abs or media_url_abs,
-                            "url": f"{base_url}/m/{media.id}",
-                            "inLanguage": "zh-CN",
-                        },
-                        {
-                            "@type": "FAQPage",
-                            "mainEntity": [
-                                {
-                                    "@type": "Question",
-                                    "name": item["q"],
-                                    "acceptedAnswer": {"@type": "Answer", "text": item["a"]},
-                                }
-                                for item in faq_items
-                            ],
-                        },
-                    ],
+                    "@graph": graph,
                 },
                 ensure_ascii=False,
             ),

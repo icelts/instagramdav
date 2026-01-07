@@ -24,3 +24,12 @@ class Config:
     # 媒体文件存储路径
     MEDIA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'media')
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
+
+    # 邮件通知配置（留言板）
+    SMTP_HOST = os.environ.get('SMTP_HOST') or ''
+    SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
+    SMTP_USER = os.environ.get('SMTP_USER') or ''
+    SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD') or ''
+    SMTP_USE_TLS = os.environ.get('SMTP_USE_TLS', '1') == '1'
+    SMTP_FROM = os.environ.get('SMTP_FROM') or SMTP_USER
+    NOTIFY_EMAIL = os.environ.get('NOTIFY_EMAIL') or ''

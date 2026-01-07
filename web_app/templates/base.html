@@ -8,6 +8,12 @@
     <meta name="keywords" content="{{ keywords or 'Instagram,采集,图片,用户资料,用户主页,帖子,粉丝,中文' }}">
     <meta name="robots" content="{{ robots or 'index,follow' }}">
     <link rel="canonical" href="{{ canonical or request.url }}">
+    {% if prev_url %}
+    <link rel="prev" href="{{ prev_url }}">
+    {% endif %}
+    {% if next_url %}
+    <link rel="next" href="{{ next_url }}">
+    {% endif %}
     <meta property="og:title" content="{{ og_title or title or 'Instagram Clone' }}">
     <meta property="og:description" content="{{ og_description or description or '采集并展示 Instagram 用户图片与资料' }}">
     <meta property="og:type" content="{{ og_type or 'website' }}">

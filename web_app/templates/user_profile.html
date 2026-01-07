@@ -54,7 +54,7 @@
   <a class="card-link" href="{{ m.detail_url }}">
     <div class="card">
       <div class="media">
-        <img src="{{ m.media_url }}" alt="{{ m.caption }}">
+        <img src="{{ m.media_url }}" alt="{{ m.caption or ('@' ~ user.username ~ ' 贴文') }}" loading="lazy" decoding="async">
       </div>
       <div class="card-body">
         <div class="caption">{{ m.caption or ' ' }}</div>
@@ -112,7 +112,7 @@
 
     const img = document.createElement("img");
     img.src = item.media_url || "";
-    img.alt = item.caption || "";
+    img.alt = item.caption || `@${username} 贴文`;
     media.appendChild(img);
 
     const body = document.createElement("div");
